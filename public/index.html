@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music USB Creator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Music USB Creator</h1>
+      <p class="subtitle">YouTube'dan muzik ara, dinle, indir, USB'ye at</p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="search">Arama & Indirme</button>
+      <button class="tab-btn" data-tab="library">Kutuphane</button>
+      <button class="tab-btn" data-tab="usb">USB'ye Kopyala</button>
+    </div>
+
+    <div id="search" class="tab-content active">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Sarki adi veya sanatci ara..." autofocus>
+        <button id="searchBtn">Ara</button>
+      </div>
+      <div id="results" class="results-grid"></div>
+    </div>
+
+    <div id="library" class="tab-content">
+      <div class="library-header">
+        <h2>Indirilen Sarkilar</h2>
+        <button id="refreshLibBtn" class="small-btn">Yenile</button>
+      </div>
+      <div id="songList" class="song-list"></div>
+    </div>
+
+    <div id="usb" class="tab-content">
+      <h2>USB'ye Kopyala</h2>
+      <div class="usb-info">
+        <p>Takili USB aygitlari:</p>
+        <div id="usbDevices"></div>
+        <button id="copyToUsbBtn" disabled>Secili USB'ye Kopyala</button>
+        <div id="copyStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <div id="previewModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <div id="previewInfo" class="preview-info"></div>
+      <audio id="previewAudio" controls></audio>
+      <button id="downloadFromPreview" class="download-btn">Indir</button>
+      <div id="previewProgress" class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Download Manager -->
+  <div id="dlFloating" class="dl-floating" onclick="toggleDlPanel()">
+    <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+    <span id="dlBadge" class="dl-badge">0</span>
+  </div>
+
+  <div id="dlPanel" class="dl-panel">
+    <div class="dl-panel-header">
+      <span>Indirme Yoneticisi</span>
+      <span id="dlPanelCount" class="dl-panel-count">0</span>
+    </div>
+    <div id="dlList" class="dl-list"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
