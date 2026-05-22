@@ -187,20 +187,23 @@ app.post('/api/search', async (req, res) => {
   }
 });
 
-app.get('/api/preview-url/:videoId', async (req, res) => {
-  try {
-    const url = `https://www.youtube.com/watch?v=${req.params.videoId}`;
-    const proc = spawn(YT_DLP, ['-f', 'bestaudio', '-g', '--no-playlist', url]);
-    let stdout = '';
-    proc.stdout.on('data', d => stdout += d);
-    proc.on('close', (code) => {
-      if (code === 0) res.json({ audioUrl: stdout.trim() });
-      else res.status(500).json({ error: 'Failed to get audio stream' });
-    });
-    proc.on('error', () => res.status(500).json({ error: 'Failed to get audio stream' }));
-  } catch (err) {
-    res.status(500).json({ error: 'Preview error' });
-  }
+app.get('/api/preview-url/:videoId', (req, res) => {
+  let responded = false;
+  const url = `https://www.youtube.com/watch?v=${req.params.videoId}`;
+  const proc = spawn(YT_DLP, ['-f', 'bestaudio', '-g', '--no-playlist', url]);
+  let stdout = '';
+  proc.stdout.on('data', d => stdout += d);
+  proc.on('close', (code) => {
+    if (responded) return;
+    responded = true;
+    if (code === 0) res.json({ audioUrl: stdout.trim() });
+    else res.status(500).json({ error: 'Failed to get audio stream' });
+  });
+  proc.on('error', () => {
+    if (responded) return;
+    responded = true;
+    res.status(500).json({ error: 'Failed to get audio stream' });
+  });
 });
 
 app.post('/api/download', (req, res) => {
