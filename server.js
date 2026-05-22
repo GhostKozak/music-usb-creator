@@ -24,8 +24,16 @@ const sseClients = new Set();
 
 function broadcast(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  const dead = [];
   for (const client of sseClients) {
-    client.write(msg);
+    try {
+      client.write(msg);
+    } catch {
+      dead.push(client);
+    }
+  }
+  for (const client of dead) {
+    sseClients.delete(client);
   }
 }
 
@@ -87,6 +95,7 @@ function startDownload(videoId, title) {
   task.process = proc;
 
   let stderrBuf = '';
+  let lastProgressBroadcast = 0;
   proc.stderr.on('data', (chunk) => {
     stderrBuf += chunk.toString();
     const lines = stderrBuf.split('\n');
@@ -100,10 +109,14 @@ function startDownload(videoId, title) {
           task.speed = parsed.speed;
           task.eta = parsed.eta;
           if (parsed.totalSize) task.totalSize = parsed.totalSize;
-          broadcast('download-progress', {
-            id, progress: task.progress, speed: task.speed,
-            eta: task.eta, totalSize: task.totalSize,
-          });
+          const now = Date.now();
+          if (now - lastProgressBroadcast > 200 || parsed.progress >= 100) {
+            lastProgressBroadcast = now;
+            broadcast('download-progress', {
+              id, progress: task.progress, speed: task.speed,
+              eta: task.eta, totalSize: task.totalSize,
+            });
+          }
         }
       }
     }
@@ -255,6 +268,13 @@ app.get('/api/downloads/stream', (req, res) => {
 
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
+  req.on('error', () => sseClients.delete(res));
+
+  const keepalive = setInterval(() => {
+    try { res.write(':keepalive\n\n'); } catch { clearInterval(keepalive); }
+  }, 15000);
+
+  req.on('close', () => clearInterval(keepalive));
 });
 
 app.get('/api/songs', (req, res) => {

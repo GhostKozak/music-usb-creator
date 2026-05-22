@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
   loadLibrary();
 });
 
+window.addEventListener('beforeunload', () => closeDlStream());
+
 // ─── Tabs ───────────────────────────────────────────────────────────
 
 function initTabs() {
@@ -125,13 +127,26 @@ function initPreviewModal() {
 }
 
 function closePreview() {
+  const audio = document.getElementById('previewAudio');
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
   document.getElementById('previewModal').classList.remove('show');
-  document.getElementById('previewAudio').pause();
 }
 
 // ─── Download Manager ───────────────────────────────────────────────
 
 const dlState = new Map();
+let dlEventSource = null;
+let dlUiThrottle = null;
+let dlUiPending = false;
+
+function closeDlStream() {
+  if (dlEventSource) {
+    dlEventSource.close();
+    dlEventSource = null;
+  }
+}
 
 function startDownload(videoId, title, btn) {
   if (btn) {
@@ -158,10 +173,22 @@ function startDownload(videoId, title, btn) {
     });
 }
 
-function connectDlStream() {
-  const es = new EventSource('/api/downloads/stream');
+function scheduleDlUI() {
+  if (dlUiPending) return;
+  dlUiPending = true;
+  if (dlUiThrottle) return;
+  dlUiThrottle = requestAnimationFrame(() => {
+    dlUiThrottle = null;
+    dlUiPending = false;
+    updateDlUI();
+  });
+}
 
-  es.addEventListener('init', e => {
+function connectDlStream() {
+  closeDlStream();
+  dlEventSource = new EventSource('/api/downloads/stream');
+
+  dlEventSource.addEventListener('init', e => {
     const list = JSON.parse(e.data);
     for (const dl of list) {
       dlState.set(dl.id, dl);
@@ -169,7 +196,7 @@ function connectDlStream() {
     updateDlUI();
   });
 
-  es.addEventListener('download-start', e => {
+  dlEventSource.addEventListener('download-start', e => {
     const dl = JSON.parse(e.data);
     dl.progress = 0;
     dl.speed = null;
@@ -181,7 +208,7 @@ function connectDlStream() {
     openDlPanel();
   });
 
-  es.addEventListener('download-progress', e => {
+  dlEventSource.addEventListener('download-progress', e => {
     const data = JSON.parse(e.data);
     const dl = dlState.get(data.id);
     if (dl) {
@@ -189,11 +216,11 @@ function connectDlStream() {
       dl.speed = data.speed;
       dl.eta = data.eta;
       dl.totalSize = data.totalSize;
-      updateDlUI();
+      scheduleDlUI();
     }
   });
 
-  es.addEventListener('download-complete', e => {
+  dlEventSource.addEventListener('download-complete', e => {
     const data = JSON.parse(e.data);
     const dl = dlState.get(data.id);
     if (dl) {
@@ -206,7 +233,7 @@ function connectDlStream() {
     }
   });
 
-  es.addEventListener('download-error', e => {
+  dlEventSource.addEventListener('download-error', e => {
     const data = JSON.parse(e.data);
     const dl = dlState.get(data.id);
     if (dl) {
@@ -217,7 +244,7 @@ function connectDlStream() {
     }
   });
 
-  es.addEventListener('download-cancelled', e => {
+  dlEventSource.addEventListener('download-cancelled', e => {
     const data = JSON.parse(e.data);
     const dl = dlState.get(data.id);
     if (dl) {
@@ -226,8 +253,9 @@ function connectDlStream() {
     }
   });
 
-  es.onerror = () => {
-    setTimeout(connectDlStream, 2000);
+  dlEventSource.onerror = () => {
+    closeDlStream();
+    setTimeout(connectDlStream, 3000);
   };
 }
 
@@ -472,9 +500,9 @@ function copyToUsb() {
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
+const escDiv = document.createElement('div');
 function esc(str) {
   if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML.replace(/'/g, "\\'");
+  escDiv.textContent = str;
+  return escDiv.innerHTML.replace(/'/g, "\\'");
 }
