@@ -187,24 +187,51 @@ app.post('/api/search', async (req, res) => {
   }
 });
 
-app.get('/api/preview-url/:videoId', (req, res) => {
-  let responded = false;
-  const url = `https://www.youtube.com/watch?v=${req.params.videoId}`;
-  const proc = spawn(YT_DLP, ['-f', 'bestaudio', '-g', '--no-playlist', url]);
-  let stdout = '';
-  proc.stdout.on('data', d => stdout += d);
-  proc.on('close', (code) => {
-    if (responded) return;
-    responded = true;
-    if (code === 0) res.json({ audioUrl: stdout.trim() });
-    else res.status(500).json({ error: 'Failed to get audio stream' });
-  });
-  proc.on('error', () => {
-    if (responded) return;
-    responded = true;
-    res.status(500).json({ error: 'Failed to get audio stream' });
-  });
+const audioUrlCache = new Map();
+
+app.get('/api/preview-stream/:videoId', async (req, res) => {
+  try {
+    const cached = audioUrlCache.get(req.params.videoId);
+    if (cached && Date.now() - cached.ts < 600000) {
+      return proxyAudioStream(cached.url, res);
+    }
+
+    const url = `https://www.youtube.com/watch?v=${req.params.videoId}`;
+    const proc = spawn(YT_DLP, ['-f', 'bestaudio[ext=m4a]/bestaudio', '-g', '--no-playlist', url]);
+    let stdout = '';
+    let err = '';
+    proc.stdout.on('data', d => stdout += d);
+    proc.stderr.on('data', d => err += d);
+    proc.on('close', (code) => {
+      if (code !== 0 || !stdout.trim()) {
+        return res.status(500).json({ error: 'Failed to get audio stream' });
+      }
+      const audioUrl = stdout.trim();
+      audioUrlCache.set(req.params.videoId, { url: audioUrl, ts: Date.now() });
+      proxyAudioStream(audioUrl, res);
+    });
+    proc.on('error', () => {
+      res.status(500).json({ error: 'Failed to get audio stream' });
+    });
+  } catch {
+    res.status(500).json({ error: 'Preview error' });
+  }
 });
+
+function proxyAudioStream(audioUrl, res) {
+  const http = require(audioUrl.startsWith('https') ? 'https' : 'http');
+  http.get(audioUrl, (proxyRes) => {
+    const ct = proxyRes.headers['content-type'] || 'audio/webm';
+    res.writeHead(200, {
+      'Content-Type': ct,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-cache',
+    });
+    proxyRes.pipe(res);
+  }).on('error', () => {
+    if (!res.headersSent) res.status(502).json({ error: 'Proxy error' });
+  });
+}
 
 app.post('/api/download', (req, res) => {
   const { videoId, title } = req.body;

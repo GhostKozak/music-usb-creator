@@ -110,15 +110,9 @@ function openPreview(videoId, title, author) {
   document.getElementById('downloadFromPreview').textContent = 'Indir';
   modal.classList.add('show');
 
-  fetch(`/api/preview-url/${videoId}`)
-    .then(r => r.json())
-    .then(data => {
-      if (data.audioUrl) {
-        document.getElementById('previewAudio').src = data.audioUrl;
-        document.getElementById('previewAudio').play().catch(() => {});
-      }
-    })
-    .catch(() => showToast('Preview alinamadi', 'error'));
+  const audio = document.getElementById('previewAudio');
+  audio.src = `/api/preview-stream/${videoId}`;
+  audio.play().catch(() => {});
 }
 
 function initPreviewModal() {
