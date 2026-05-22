@@ -291,6 +291,141 @@ header h1 {
   background: #7a2222;
 }
 
+/* ─── Batch Download ──────────────────────────────────────────── */
+
+.batch-box {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.batch-box label {
+  display: block;
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+
+#batchUrls {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #333;
+  background: #0f0f0f;
+  color: #e0e0e0;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-family: monospace;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+#batchUrls:focus {
+  border-color: #ff4444;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.primary-btn {
+  padding: 10px 24px;
+  background: #ff4444;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.primary-btn:hover {
+  background: #cc3333;
+}
+
+.primary-btn:disabled {
+  background: #444;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.batch-count {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.batch-status {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.batch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #1a1a1a;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.batch-item-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.batch-item-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ccc;
+}
+
+.batch-item-status {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.batch-item-status.queued { color: #888; background: #2a2a2a; }
+.batch-item-status.downloading { color: #ffaa44; background: #2a1f0a; }
+.batch-item-status.completed { color: #1db954; background: #0d2818; }
+.batch-item-status.error { color: #ff4444; background: #2a0f0f; }
+.batch-item-status.cancelled { color: #666; background: #1a1a1a; }
+
+.batch-progress {
+  height: 3px;
+  background: #2a2a2a;
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.batch-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+  background: linear-gradient(90deg, #ff4444, #ff6b6b);
+}
+
+.batch-progress-fill.completed { background: #1db954; }
+
 .usb-info p {
   margin-bottom: 12px;
   color: #888;

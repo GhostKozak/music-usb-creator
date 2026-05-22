@@ -14,9 +14,10 @@
     </header>
 
     <div class="tabs">
-      <button class="tab-btn active" data-tab="search">Arama & Indirme</button>
+      <button class="tab-btn active" data-tab="search">Arama</button>
+      <button class="tab-btn" data-tab="batch">Toplu Indir</button>
       <button class="tab-btn" data-tab="library">Kutuphane</button>
-      <button class="tab-btn" data-tab="usb">USB'ye Kopyala</button>
+      <button class="tab-btn" data-tab="usb">USB</button>
     </div>
 
     <div id="search" class="tab-content active">
@@ -25,6 +26,19 @@
         <button id="searchBtn">Ara</button>
       </div>
       <div id="results" class="results-grid"></div>
+    </div>
+
+    <div id="batch" class="tab-content">
+      <div class="batch-box">
+        <label for="batchUrls">YouTube URL'lerini yapistir (her satira bir tane):</label>
+        <textarea id="batchUrls" rows="8" placeholder="https://www.youtube.com/watch?v=...&#10;https://youtu.be/...&#10;https://www.youtube.com/watch?v=..."></textarea>
+        <div class="batch-actions">
+          <button id="batchStartBtn" class="primary-btn">Tumunu Indir</button>
+          <span id="batchCount" class="batch-count">0 URL</span>
+        </div>
+        <div id="batchStatus" class="batch-status"></div>
+      </div>
+      <div id="batchList" class="batch-list"></div>
     </div>
 
     <div id="library" class="tab-content">

@@ -7,6 +7,7 @@ let dlPanelOpen = false;
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initSearch();
+  initBatch();
   initLibrary();
   initUsb();
   initPreviewModal();
@@ -498,11 +499,203 @@ function copyToUsb() {
     });
 }
 
+// ─── Batch Download ─────────────────────────────────────────────────
+
+function initBatch() {
+  const textarea = document.getElementById('batchUrls');
+  const btn = document.getElementById('batchStartBtn');
+  const countEl = document.getElementById('batchCount');
+
+  textarea.addEventListener('input', () => {
+    const urls = parseUrls(textarea.value);
+    countEl.textContent = `${urls.length} URL`;
+  });
+
+  btn.addEventListener('click', () => startBatchDownload());
+}
+
+function parseUrls(text) {
+  const urls = [];
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const id = extractVideoId(trimmed);
+    if (id) urls.push({ url: trimmed, id });
+  }
+  return urls;
+}
+
+function extractVideoId(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+let batchItems = [];
+let batchRunning = false;
+
+function startBatchDownload() {
+  const text = document.getElementById('batchUrls').value;
+  const parsed = parseUrls(text);
+
+  if (parsed.length === 0) {
+    showToast("Gecerli YouTube URL'si bulunamadi", 'error');
+    return;
+  }
+
+  batchItems = parsed.map(p => ({
+    ...p,
+    title: p.url,
+    status: 'queued',
+    downloadId: null,
+  }));
+
+  renderBatchList();
+  document.getElementById('batchStartBtn').disabled = true;
+  document.getElementById('batchStatus').textContent = `${batchItems.length} sarki sıraya alindi. Indiriliyor...`;
+
+  batchRunning = true;
+  processBatchQueue();
+}
+
+function processBatchQueue() {
+  if (!batchRunning) return;
+
+  const next = batchItems.find(item => item.status === 'queued');
+  if (!next) {
+    batchRunning = false;
+    document.getElementById('batchStartBtn').disabled = false;
+    const allDone = batchItems.every(i => i.status === 'completed');
+    document.getElementById('batchStatus').textContent = allDone
+      ? 'Tum sarkiler indirildi!'
+      : 'Indirme tamamlandi (bazilari hatali).';
+    return;
+  }
+
+  next.status = 'downloading';
+  renderBatchItem(next);
+
+  fetch('/api/download', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ videoId: next.id, title: '' }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.downloadId) {
+        next.downloadId = data.downloadId;
+
+        const checkStatus = () => {
+          const dl = dlState.get(next.downloadId);
+          if (!dl) {
+            setTimeout(checkStatus, 500);
+            return;
+          }
+          if (dl.status === 'completed') {
+            next.status = 'completed';
+            next.title = dl.filename || next.title;
+            renderBatchItem(next);
+            setTimeout(processBatchQueue, 300);
+          } else if (dl.status === 'error') {
+            next.status = 'error';
+            next.title = dl.filename || next.title;
+            renderBatchItem(next);
+            setTimeout(processBatchQueue, 300);
+          } else if (dl.status === 'cancelled') {
+            next.status = 'cancelled';
+            renderBatchItem(next);
+            setTimeout(processBatchQueue, 300);
+          } else {
+            const pct = dl.progress || 0;
+            updateBatchProgress(next, pct);
+            setTimeout(checkStatus, 400);
+          }
+        };
+        setTimeout(checkStatus, 500);
+      } else {
+        next.status = 'error';
+        renderBatchItem(next);
+        setTimeout(processBatchQueue, 500);
+      }
+    })
+    .catch(() => {
+      next.status = 'error';
+      renderBatchItem(next);
+      setTimeout(processBatchQueue, 500);
+    });
+}
+
+function renderBatchList() {
+  const container = document.getElementById('batchList');
+  container.innerHTML = batchItems.map(item => {
+    const icon = item.status === 'queued' ? '&#9632;' :
+      item.status === 'downloading' ? '&#8635;' :
+      item.status === 'completed' ? '&#10003;' :
+      item.status === 'error' ? '&#10007;' : '&#9632;';
+    const statusClass = item.status;
+
+    return `
+      <div class="batch-item" id="batch-${esc(item.id)}">
+        <span class="batch-item-icon">${icon}</span>
+        <span class="batch-item-title">${esc(item.title)}</span>
+        <div class="batch-progress">
+          <div class="batch-progress-fill ${item.status === 'completed' ? 'completed' : ''}" style="width:${item.status === 'downloading' ? '0%' : item.status === 'completed' ? '100%' : '0%'}" id="batch-progress-${esc(item.id)}"></div>
+        </div>
+        <span class="batch-item-status ${statusClass}">${statusText(item.status)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderBatchItem(item) {
+  const el = document.getElementById(`batch-${item.id}`);
+  if (!el) {
+    renderBatchList();
+    return;
+  }
+  const icon = item.status === 'queued' ? '&#9632;' :
+    item.status === 'downloading' ? '&#8635;' :
+    item.status === 'completed' ? '&#10003;' :
+    item.status === 'error' ? '&#10007;' : '&#9632;';
+  el.querySelector('.batch-item-icon').innerHTML = icon;
+  el.querySelector('.batch-item-title').textContent = item.title || item.url;
+  el.querySelector('.batch-item-status').className = `batch-item-status ${item.status}`;
+  el.querySelector('.batch-item-status').textContent = statusText(item.status);
+  const fill = el.querySelector('.batch-progress-fill');
+  fill.className = `batch-progress-fill ${item.status === 'completed' ? 'completed' : ''}`;
+  if (item.status === 'completed') fill.style.width = '100%';
+}
+
+function updateBatchProgress(item, pct) {
+  const el = document.getElementById(`batch-${item.id}`);
+  if (!el) return;
+  const fill = el.querySelector('.batch-progress-fill');
+  fill.style.width = `${Math.round(pct)}%`;
+  const statusEl = el.querySelector('.batch-item-status');
+  statusEl.textContent = `${Math.round(pct)}%`;
+}
+
+function statusText(status) {
+  return status === 'queued' ? 'Bekliyor' :
+    status === 'downloading' ? '0%' :
+    status === 'completed' ? 'Tamam' :
+    status === 'error' ? 'Hata' :
+    status === 'cancelled' ? 'Iptal' : status;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 const escDiv = document.createElement('div');
 function esc(str) {
   if (!str) return '';
   escDiv.textContent = str;
-  return escDiv.innerHTML.replace(/'/g, "\\'");
+  return escDiv.innerHTML.replace(/'/g, '&#39;');
 }
